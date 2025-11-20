@@ -5,8 +5,10 @@ from numpy import linalg
 
 V_PREV_THRES = 0.0001
 
+
 class TrajectoryTracker:
     """ Trajectory tracking controller using differential flatness """
+
     def __init__(self, kpx: float, kpy: float, kdx: float, kdy: float,
                  V_max: float = 0.5, om_max: float = 1) -> None:
         self.kpx = kpx
@@ -17,8 +19,8 @@ class TrajectoryTracker:
         self.V_max = V_max
         self.om_max = om_max
 
-        self.coeffs = np.zeros(8) # Polynomial coefficients for x(t) and y(t) as
-                                  # returned by the differential flatness code
+        self.coeffs = np.zeros(8)  # Polynomial coefficients for x(t) and y(t) as
+        # returned by the differential flatness code
 
     def reset(self) -> None:
         self.V_prev = 0.
@@ -32,7 +34,7 @@ class TrajectoryTracker:
         self.traj = traj
 
     def get_desired_state(self, t: float) -> T.Tuple[np.ndarray, np.ndarray, np.ndarray,
-                                                     np.ndarray, np.ndarray, np.ndarray]:
+    np.ndarray, np.ndarray, np.ndarray]:
         """
         Input:
             t: Current time
@@ -40,12 +42,12 @@ class TrajectoryTracker:
             x_d, xd_d, xdd_d, y_d, yd_d, ydd_d: Desired state and derivatives
                 at time t according to self.coeffs
         """
-        x_d = np.interp(t,self.traj_times,self.traj[:,0])
-        y_d = np.interp(t,self.traj_times,self.traj[:,1])
-        xd_d = np.interp(t,self.traj_times,self.traj[:,3])
-        yd_d = np.interp(t,self.traj_times,self.traj[:,4])
-        xdd_d = np.interp(t,self.traj_times,self.traj[:,5])
-        ydd_d = np.interp(t,self.traj_times,self.traj[:,6])
+        x_d = np.interp(t, self.traj_times, self.traj[:, 0])
+        y_d = np.interp(t, self.traj_times, self.traj[:, 1])
+        xd_d = np.interp(t, self.traj_times, self.traj[:, 3])
+        yd_d = np.interp(t, self.traj_times, self.traj[:, 4])
+        xdd_d = np.interp(t, self.traj_times, self.traj[:, 5])
+        ydd_d = np.interp(t, self.traj_times, self.traj[:, 6])
 
         return x_d, xd_d, xdd_d, y_d, yd_d, ydd_d
 
@@ -62,6 +64,28 @@ class TrajectoryTracker:
         x_d, xd_d, xdd_d, y_d, yd_d, ydd_d = self.get_desired_state(t)
 
         ########## Code starts here ##########
+        u = np.zeros(2)
+        u[0] = xdd_d + self.kpx * (x_d - x) + self.kdx * (xd_d - self.V_prev * np.cos(th))
+        u[1] = ydd_d + self.kpy * (y_d - y) + self.kdy * (yd_d - self.V_prev * np.sin(th))
+        # print("error", xdd_d, x_d - x, xd_d - self.V_prev * np.cos(th))
+        # print("error", ydd_d, y_d - y, yd_d - self.V_prev * np.sin(th))
+        # print("virtual controls", u)
+
+        # if self.V_prev < 0:
+        #     raise ValueError("V_prev must be > 0")
+        if self.V_prev >= 0:
+            V_nominal = np.clip(self.V_prev, V_PREV_THRES, None)
+        else:
+            V_nominal = np.clip(self.V_prev, None, -V_PREV_THRES)
+        # print("nominal", V_nominal, self.V_prev)
+
+        J_inv = np.array([[np.cos(th), np.sin(th)],
+                          [-np.sin(th) / V_nominal, np.cos(th) / V_nominal]])
+
+        control = np.dot(J_inv, u)
+        V = V_nominal + control[0] * dt
+        # print(V, "vs", np.sqrt(xd_d ** 2 + yd_d ** 2))
+        om = control[1]
 
         ########## Code ends here ##########
 

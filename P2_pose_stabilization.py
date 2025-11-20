@@ -25,7 +25,7 @@ class PoseController:
         self.y_g = y_g
         self.th_g = th_g
 
-    def compute_control(self, x: float, y: float, th: float, t: float) -> T.Tuple[float, float]:
+    def compute_control(self, x: float, y: float, theta: float, t: float) -> T.Tuple[float, float]:
         """
         Inputs:
             x,y,th: Current state
@@ -37,6 +37,13 @@ class PoseController:
         may also be useful, look up its documentation
         """
         ########## Code starts here ##########
+        rho = np.sqrt(x ** 2 + y ** 2)
+        alpha = np.arctan2(y, x) - theta + np.pi
+        delta = wrapToPi(alpha + theta)
+        alpha = wrapToPi(alpha)
+
+        V = self.k1 * rho * np.cos(alpha)
+        om = self.k2 * alpha + self.k1 * np.sinc(alpha / np.pi) * np.cos(alpha) * (alpha + self.k3 * delta)
 
         ########## Code ends here ##########
 
