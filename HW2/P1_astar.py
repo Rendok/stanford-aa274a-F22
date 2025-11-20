@@ -3,28 +3,29 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from utils import plot_line_segments
 
+
 class AStar(object):
     """Represents a motion planning problem to be solved using A*"""
 
-    def __init__(self, statespace_lo, statespace_hi, x_init, x_goal, occupancy, resolution=1)->None:
-        self.statespace_lo = np.array(statespace_lo)         # state space lower bound (e.g., [-5, -5])
-        self.statespace_hi = np.array(statespace_hi)         # state space upper bound (e.g., [5, 5])
-        self.occupancy = occupancy                 # occupancy grid (a DetOccupancyGrid2D object)
-        self.resolution = resolution               # resolution of the discretization of state space (cell/m)
-        self.x_init = self.snap_to_grid(x_init)    # initial state
-        self.x_goal = self.snap_to_grid(x_goal)    # goal state
+    def __init__(self, statespace_lo, statespace_hi, x_init, x_goal, occupancy, resolution=1) -> None:
+        self.statespace_lo = np.array(statespace_lo)  # state space lower bound (e.g., [-5, -5])
+        self.statespace_hi = np.array(statespace_hi)  # state space upper bound (e.g., [5, 5])
+        self.occupancy: DetOccupancyGrid2D = occupancy  # occupancy grid (a DetOccupancyGrid2D object)
+        self.resolution = resolution  # resolution of the discretization of state space (cell/m)
+        self.x_init = self.snap_to_grid(x_init)  # initial state
+        self.x_goal = self.snap_to_grid(x_goal)  # goal state
 
-        self.closed_set = set()    # the set containing the states that have been visited
-        self.open_set = set()      # the set containing the states that are condidate for future expension
-        self.est_cost_through = np.inf*np.ones((self.statespace_hi - self.statespace_lo)//self.resolution + 1)  # 2d map of the estimated cost from start to goal passing through state (often called f score)
-        self.cost_to_arrive = np.inf*np.ones((self.statespace_hi - self.statespace_lo)//self.resolution + 1)    # 2d map of the cost-to-arrive at state from start (often called g score)
-        self.came_from = {}         # dictionary keeping track of each state's parent to reconstruct the path
+        self.closed_set = set()  # the set containing the states that have been visited
+        self.open_set = set()  # the set containing the states that are condidate for future expension
+        self.est_cost_through = np.inf * np.ones((self.statespace_hi - self.statespace_lo) // self.resolution + 1)  # 2d map of the estimated cost from start to goal passing through state (often called f score)
+        self.cost_to_arrive = np.inf * np.ones((self.statespace_hi - self.statespace_lo) // self.resolution + 1)  # 2d map of the cost-to-arrive at state from start (often called g score)
+        self.came_from = {}  # dictionary keeping track of each state's parent to reconstruct the path
 
         self.open_set.add(self.x_init)
         self.cost_to_arrive[self.x_init] = 0
-        self.est_cost_through[self.x_init] = self.distance(self.x_init,self.x_goal)
+        self.est_cost_through[self.x_init] = self.distance(self.x_init, self.x_goal)
 
-        self.path = None        # the final path as a list of states
+        self.path = None  # the final path as a list of states
 
     def is_free(self, x):
         """
@@ -38,7 +39,9 @@ class AStar(object):
               useful here
         """
         ########## Code starts here ##########
-
+        if any(x < self.statespace_lo) or any(x > self.statespace_hi) or not self.occupancy.is_free(x):
+            return False
+        return True
         ########## Code ends here ##########
 
     def distance(self, x1, x2):
@@ -53,7 +56,7 @@ class AStar(object):
         HINT: This should take one line. Tuples can be converted to numpy arrays using np.array().
         """
         ########## Code starts here ##########
-        
+        return np.linalg.norm(np.array(x1) - np.array(x2))
         ########## Code ends here ##########
 
     def snap_to_grid(self, x):
@@ -63,7 +66,7 @@ class AStar(object):
         Output:
             A tuple that represents the closest point to x on the discrete state grid
         """
-        return (self.resolution*round(x[0]/self.resolution), self.resolution*round(x[1]/self.resolution))
+        return (self.resolution * round(x[0] / self.resolution), self.resolution * round(x[1] / self.resolution))
 
     def get_neighbors(self, x):
         """
@@ -86,7 +89,14 @@ class AStar(object):
         """
         neighbors = []
         ########## Code starts here ##########
-        
+        for x_delta in [-self.resolution, 0, self.resolution]:
+            for y_delta in [-self.resolution, 0, self.resolution]:
+                if x_delta == 0 and y_delta == 0:
+                    continue
+                state = self.snap_to_grid(x + np.array([x_delta, y_delta]))
+                if self.is_free(state):
+                    neighbors.append(state)
+
         ########## Code ends here ##########
         return neighbors
 
@@ -119,18 +129,23 @@ class AStar(object):
         self.occupancy.plot(fig_num)
 
         solution_path = np.array(self.path) * self.resolution
-        plt.plot(solution_path[:,0],solution_path[:,1], color="green", linewidth=2, label="A* solution path", zorder=10)
-        plt.scatter([self.x_init[0]*self.resolution, self.x_goal[0]*self.resolution], [self.x_init[1]*self.resolution, self.x_goal[1]*self.resolution], color="green", s=30, zorder=10)
+        plt.plot(solution_path[:, 0], solution_path[:, 1], color="green", linewidth=2, label="A* solution path",
+                 zorder=10)
+        plt.scatter([self.x_init[0] * self.resolution, self.x_goal[0] * self.resolution],
+                    [self.x_init[1] * self.resolution, self.x_goal[1] * self.resolution], color="green", s=30,
+                    zorder=10)
         if show_init_label:
-            plt.annotate(r"$x_{init}$", np.array(self.x_init)*self.resolution + np.array([.2, .2]), fontsize=16)
-        plt.annotate(r"$x_{goal}$", np.array(self.x_goal)*self.resolution + np.array([.2, .2]), fontsize=16)
+            plt.annotate(r"$x_{init}$", np.array(self.x_init) * self.resolution + np.array([.2, .2]), fontsize=16)
+        plt.annotate(r"$x_{goal}$", np.array(self.x_goal) * self.resolution + np.array([.2, .2]), fontsize=16)
         plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.03), fancybox=True, ncol=3)
 
         plt.axis([0, self.occupancy.width, 0, self.occupancy.height])
 
     def plot_tree(self, point_size=15):
-        plot_line_segments([(x, self.came_from[x]) for x in self.open_set if x != self.x_init], linewidth=1, color="blue", alpha=0.2)
-        plot_line_segments([(x, self.came_from[x]) for x in self.closed_set if x != self.x_init], linewidth=1, color="blue", alpha=0.2)
+        plot_line_segments([(x, self.came_from[x]) for x in self.open_set if x != self.x_init], linewidth=1,
+                           color="blue", alpha=0.2)
+        plot_line_segments([(x, self.came_from[x]) for x in self.closed_set if x != self.x_init], linewidth=1,
+                           color="blue", alpha=0.2)
         px = [x[0] for x in self.open_set | self.closed_set if x != self.x_init and x != self.x_goal]
         py = [x[1] for x in self.open_set | self.closed_set if x != self.x_init and x != self.x_goal]
         plt.scatter(px, py, color="blue", s=point_size, zorder=10, alpha=0.2)
@@ -151,14 +166,38 @@ class AStar(object):
                 set membership efficiently using the syntax "if item in set".
         """
         ########## Code starts here ##########
-        
+        while self.open_set:
+            node = self.find_best_est_cost_through()
+            if node == self.x_goal:
+                self.path = self.reconstruct_path()
+                return True
+
+            # print(node)
+            self.open_set.remove(node)
+            self.closed_set.add(node)
+            for neighbour in self.get_neighbors(node):
+                # print(neighbour)
+                if neighbour in self.closed_set:
+                    continue
+                tentative_cost_to_arrive = self.cost_to_arrive[node] + self.distance(node, neighbour)
+                if neighbour not in self.open_set:
+                    self.open_set.add(neighbour)
+                elif tentative_cost_to_arrive > self.cost_to_arrive[neighbour]:
+                    continue
+                self.came_from[neighbour] = node
+                self.cost_to_arrive[neighbour] = tentative_cost_to_arrive
+                self.est_cost_through[neighbour] = tentative_cost_to_arrive + self.distance(neighbour, self.x_goal)
+
+        return False
         ########## Code ends here ##########
+
 
 class DetOccupancyGrid2D(object):
     """
     A 2D state space grid with a set of rectangular obstacles. The grid is
     fully deterministic
     """
+
     def __init__(self, width, height, obstacles):
         self.width = width
         self.height = height
@@ -182,8 +221,8 @@ class DetOccupancyGrid2D(object):
         ax = fig.add_subplot(111, aspect='equal')
         for obs in self.obstacles:
             ax.add_patch(
-            patches.Rectangle(
-            obs[0],
-            obs[1][0]-obs[0][0],
-            obs[1][1]-obs[0][1],))
-        ax.set(xlim=(0,self.width), ylim=(0,self.height))
+                patches.Rectangle(
+                    obs[0],
+                    obs[1][0] - obs[0][0],
+                    obs[1][1] - obs[0][1], ))
+        ax.set(xlim=(0, self.width), ylim=(0, self.height))
